@@ -3,6 +3,10 @@ package com.udacity.catpoint.data;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.lang.reflect.Type;
 import java.util.Set;
 import java.util.TreeSet;
@@ -89,4 +93,5 @@ public class PretendDatabaseSecurityRepositoryImpl implements SecurityRepository
     public ArmingStatus getArmingStatus() {
         return armingStatus;
     }
+
 }

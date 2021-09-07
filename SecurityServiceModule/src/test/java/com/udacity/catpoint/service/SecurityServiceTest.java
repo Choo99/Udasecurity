@@ -20,14 +20,17 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SecurityServiceTest {
-
+/*
     private SecurityService securityService;
 
     @Mock
@@ -39,12 +42,16 @@ class SecurityServiceTest {
     @Mock
     private ImageService imageService;
 
-    @Mock
-    private BufferedImage image;
 
     @BeforeEach
     void init(){
         securityService = new SecurityService(securityRepository,imageService);
+    }
+
+    private Set<Sensor> getSensors(){
+        Set<Sensor> sensors = new HashSet<>();
+        sensors.add(sensor);
+        return sensors;
     }
 
     @Test
@@ -60,7 +67,6 @@ class SecurityServiceTest {
     @Test
     public void alamStatus_armedAndactived_alarm(){
         when(sensor.getActive()).thenReturn(false);
-        when(securityService.getArmingStatus()).thenReturn(ArmingStatus.ARMED_HOME);
         when(securityService.getAlarmStatus()).thenReturn(AlarmStatus.PENDING_ALARM);
 
         securityService.changeSensorActivationStatus(sensor,true);
@@ -70,9 +76,10 @@ class SecurityServiceTest {
     @Test
     public void alamStatus_pendingAndinactive_Noalarm(){
         when(sensor.getActive()).thenReturn(true);
-        when(securityRepository.getAlarmStatus()).thenReturn(AlarmStatus.PENDING_ALARM);
+        when(securityRepository.getSensors()).thenReturn(getSensors());
+        when(sensor.getActive()).thenReturn(false);
 
-        securityService.changeSensorActivationStatus(sensor,false);
+        securityService.setAlarmStatus(AlarmStatus.PENDING_ALARM);
         verify(securityRepository,times(1)).setAlarmStatus(eq(AlarmStatus.NO_ALARM));
     }
 
@@ -83,7 +90,8 @@ class SecurityServiceTest {
         when(securityRepository.getAlarmStatus()).thenReturn(AlarmStatus.ALARM);
 
         securityService.changeSensorActivationStatus(sensor,active);
-        verify(securityRepository,times(0)).setAlarmStatus(any());
+        verify(securityRepository,never()).setAlarmStatus(any(AlarmStatus.class));
+        verify(securityRepository,times(1)).updateSensor(sensor);
     }
 
     @Test
@@ -106,20 +114,23 @@ class SecurityServiceTest {
     @Test
     public void alamStatus_catDetectedAndArmed_alarm(){
         when(securityRepository.getArmingStatus()).thenReturn(ArmingStatus.ARMED_HOME);
-        when(imageService.imageContainsCat(image,50.0f)).thenReturn(true);
+        when(imageService.imageContainsCat(any(BufferedImage.class),anyFloat())).thenReturn(true);
 
-        securityService.processImage(image);
+        securityService.processImage(mock(BufferedImage.class));
 
         verify(securityRepository,times(1)).setAlarmStatus(AlarmStatus.ALARM);
     }
 
     @Test
     public void alamStatus_catNotDetectedAndSensorInactive_Noalarm(){
-        when(imageService.imageContainsCat(image,50.0f)).thenReturn(false);
         InOrder inOrder = Mockito.inOrder(securityRepository);
 
-        securityService.processImage(image);
-        inOrder.verify(securityRepository,times(1)).setAlarmStatus(AlarmStatus.NO_ALARM);
+        when(imageService.imageContainsCat(any(),anyFloat())).thenReturn(false);
+        when(securityRepository.getSensors()).thenReturn(getSensors());
+        when(sensor.getActive()).thenReturn(false);
+        securityService.processImage(mock(BufferedImage.class));
+
+        inOrder.verify(securityRepository,atLeast(1)).setAlarmStatus(AlarmStatus.NO_ALARM);
 
         when(sensor.getActive()).thenReturn(false);
         when(securityRepository.getAlarmStatus()).thenReturn(AlarmStatus.NO_ALARM);
@@ -130,35 +141,33 @@ class SecurityServiceTest {
     @Test
     public void alamStatus_disarmed_NoAlarm(){
         securityService.setArmingStatus(ArmingStatus.DISARMED);
-        verify(securityRepository).setAlarmStatus(AlarmStatus.NO_ALARM);
+        verify(securityRepository,times(1)).setAlarmStatus(AlarmStatus.NO_ALARM);
     }
-/*
+
     @Test
     public void sensorActivation_armed_AllsensorsDisable(){
+        when(securityRepository.getSensors()).thenReturn(getSensors());
         securityService.setArmingStatus(ArmingStatus.ARMED_HOME);
-        verify(securityRepository,atLeast(1)).updateSensor(sensor);
-    }*/
-/*
-    @ParameterizedTest
-    @MethodSource("differentAlarmStatus")
-    public void alarmStatus_armedHomeWhileShowsCat_alarm(ArmingStatus alarmStatus){
-        InOrder inOrder = Mockito.inOrder(securityRepository);
-        when(imageService.imageContainsCat(image,50.0f)).thenReturn(true);
-        when(securityRepository.getArmingStatus()).thenReturn(alarmStatus);
+        verify(sensor,atLeast(1)).setActive(false);
+    }
 
-        securityService.processImage(image);
-        inOrder.verify(securityRepository).setAlarmStatus(AlarmStatus.NO_ALARM);
+    @Test
+    public void alarmStatus_armedHomeWhileShowsCat_alarm(){
+        InOrder inOrder = Mockito.inOrder(securityRepository);
+        when(imageService.imageContainsCat(any(),anyFloat())).thenReturn(true);
+        when(securityRepository.getArmingStatus()).thenReturn(ArmingStatus.ARMED_HOME);
+
+        securityService.processImage(mock(BufferedImage.class));
 
         securityService.setArmingStatus(ArmingStatus.ARMED_HOME);
         inOrder.verify(securityRepository).setAlarmStatus(AlarmStatus.ALARM);
     }
-*/
-    private static Stream<Arguments> differentAlarmStatus(){
+
+    private Stream<Arguments> armingStatusAndActivationStatusProvider(){
         return Stream.of(
                 Arguments.of(
-                        ArmingStatus.DISARMED,
-                        ArmingStatus.ARMED_AWAY
+
                 )
         );
-    }
+    }*/
 }

@@ -3,8 +3,8 @@ module SecurityServiceModule {
     requires guava;
     requires java.prefs;
     requires miglayout;
-    requires ImageServiceModule;
     requires com.google.gson;
-    opens com.udacity.catpoint.data;
-    opens com.udacity.catpoint.service;
+    requires ImageServiceModule;
+    opens com.udacity.catpoint.data to com.google.gson;
+    //pens com.udacity.catpoint.service;
 }

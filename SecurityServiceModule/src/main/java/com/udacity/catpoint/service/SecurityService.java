@@ -9,7 +9,9 @@ import com.udacity.catpoint.imageService.ImageService;
 
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
  * Service that receives information about changes to the security system. Responsible for
@@ -37,8 +39,35 @@ public class SecurityService {
     public void setArmingStatus(ArmingStatus armingStatus) {
         if(armingStatus == ArmingStatus.DISARMED) {
             setAlarmStatus(AlarmStatus.NO_ALARM);
+        } else {
+            resetSensorsActivation(false);
+            ConcurrentSkipListSet<Sensor> sensors = new ConcurrentSkipListSet<>(getSensors());
+            sensors.forEach(s -> changeSensorActivationStatus(s, false));
         }
         securityRepository.setArmingStatus(armingStatus);
+        statusListeners.forEach(sl -> sl.sensorStatusChanged());
+    }
+
+    private void changeActivationStatusForSensors(Set<Sensor> sensors, boolean active) {
+        sensors.forEach(it -> {
+            System.out.println("Sensor is active before " + it.getActive());
+        });
+
+        System.out.println("Alarm pending and system activated");
+        sensors.stream().forEach(it -> changeSensorActivationStatus(it, active));
+
+        System.out.println("\n");
+        sensors.forEach(it -> {
+            System.out.println("Sensor is active " + it.getActive());
+        });
+        statusListeners.forEach(sl -> sl.sensorStatusChanged());
+    }
+    private void resetSensorsActivation(boolean active){
+        Set<Sensor> sensors = getSensors();
+       for(Iterator<Sensor> iterator = sensors.iterator();iterator.hasNext();) {
+           Sensor sensor = iterator.next();
+           changeSensorActivationStatus(sensor, active);
+       }
     }
 
     /**
@@ -49,7 +78,7 @@ public class SecurityService {
     private void catDetected(Boolean cat) {
         if(cat && getArmingStatus() == ArmingStatus.ARMED_HOME) {
             setAlarmStatus(AlarmStatus.ALARM);
-        } else {
+        } else if(!cat && !isAllSensorActivated()){
             setAlarmStatus(AlarmStatus.NO_ALARM);
         }
 
@@ -73,8 +102,16 @@ public class SecurityService {
      * @param status
      */
     public void setAlarmStatus(AlarmStatus status) {
-        securityRepository.setAlarmStatus(status);
+        if(isAllSensorActivated() && status == AlarmStatus.PENDING_ALARM){
+            setAlarmStatus(AlarmStatus.NO_ALARM);
+        }else {
+            securityRepository.setAlarmStatus(status);
+        }
         statusListeners.forEach(sl -> sl.notify(status));
+    }
+
+    private boolean isAllSensorActivated(){
+        return getSensors().stream().allMatch(it -> it.getActive()== true);
     }
 
     /**
@@ -84,9 +121,14 @@ public class SecurityService {
         if(securityRepository.getArmingStatus() == ArmingStatus.DISARMED) {
             return; //no problem if the system is disarmed
         }
-        switch(securityRepository.getAlarmStatus()) {
+
+        AlarmStatus alarmStatus = securityRepository.getAlarmStatus();
+
+
+        switch(alarmStatus) {
             case NO_ALARM -> setAlarmStatus(AlarmStatus.PENDING_ALARM);
             case PENDING_ALARM -> setAlarmStatus(AlarmStatus.ALARM);
+            default -> {}
         }
     }
 
@@ -97,6 +139,7 @@ public class SecurityService {
         switch(securityRepository.getAlarmStatus()) {
             case PENDING_ALARM -> setAlarmStatus(AlarmStatus.NO_ALARM);
             case NO_ALARM -> setAlarmStatus(AlarmStatus.ALARM);
+            default -> {}
         }
     }
 
@@ -106,10 +149,15 @@ public class SecurityService {
      * @param active
      */
     public void changeSensorActivationStatus(Sensor sensor, Boolean active) {
-        if((!sensor.getActive() && active) || (sensor.getActive() && active)) {
-            handleSensorActivated();
-        } else if (sensor.getActive() && !active) {
-            handleSensorDeactivated();
+        boolean wasActive = sensor.getActive();
+        Boolean activate = !wasActive && active;
+        Boolean deaActivate = wasActive && !active;
+        if (activate || deaActivate){
+            if (activate){
+                handleSensorActivated();
+            } else {
+                handleSensorDeactivated();
+            }
         }
         sensor.setActive(active);
         securityRepository.updateSensor(sensor);
